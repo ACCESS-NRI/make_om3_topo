@@ -6,6 +6,7 @@
 #
 # Usage:
 #   ./finalise_B_mask.sh 25km
+#   ./finalise_B_mask.sh 8km
 #   ./finalise_B_mask.sh 100km
 
 set -e
@@ -17,13 +18,18 @@ case "${1:-25km}" in
     NCFILE="B_mask_25km.nc"
     LABEL="25km"
     ;;
+  8km)
+    NOTEBOOK="make_B_mask_8km.ipynb"
+    NCFILE="B_mask_8km.nc"
+    LABEL="8km"
+    ;;
   100km)
     NOTEBOOK="make_B_mask_100km.ipynb"
     NCFILE="B_mask_100km.nc"
     LABEL="100km"
     ;;
   *)
-    echo "Usage: $0 [25km|100km]"
+    echo "Usage: $0 [25km|8km|100km]"
     exit 1
     ;;
 esac
