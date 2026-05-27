@@ -39,8 +39,9 @@ The workflow [`gen_topo.sh`](https://github.com/ACCESS-NRI/make_om3_topo/blob/ma
    - for smaller cases such as 100km you can run with a positional argument; for 25km submit with qsub using RESOLUTION:
    ```bash
    ./gen_topo.sh 100km
-   qsub -v RESOLUTION=25km -P PROJECT gen_topo.sh
+   qsub -v RESOLUTION=25km -P $PROJECT gen_topo.sh
    ```
+   - after generating the topography, this will then generate most other masks, forcing and remapping files needed by OM3
 
 4. **Check the output files look OK**
 
@@ -58,7 +59,7 @@ The workflow [`gen_topo.sh`](https://github.com/ACCESS-NRI/make_om3_topo/blob/ma
 
 6. **Finalise Output Files**
 
-   Once the output files meet your satisfaction, commit and push the changes, then run `finalise.sh` with the same resolution to add the git commit hash as metadata in the output `.nc` files for provenance. A positional argument specifying the resolution is required:
+   Once the output files meet your satisfaction, to commit and push the changes run `finalise.sh`. This adds the git commit hash as metadata in the output `.nc` files for provenance. This then triggers creation of the other input/forcing files which depends on the grid and bathymetry, including ESMF mesh files, tidal and wombatlite forcings. A positional argument specifying the resolution is required:
   ```bash
    ./finalise.sh 25km
    ./finalise.sh 100km
@@ -66,4 +67,4 @@ The workflow [`gen_topo.sh`](https://github.com/ACCESS-NRI/make_om3_topo/blob/ma
 
 ## Note on Dependencies  
 
-This workflow relies on the **xp65 conda environments** for running the scripts and generating the outputs. As long as you are [a member of the _xp65_ project](https://my.nci.org.au/mancini/project/xp65/members/active), this conda environment is loaded as part of the scripts.
+This workflow relies on the **xp65 conda environments** for running the scripts and generating the outputs. As long as you are [a member of the _xp65_ project](https://my.nci.org.au/mancini/project/xp65/members/active), this conda environment is loaded as part of the scripts. There's is data loaded from the `av17`, `ik11` and `xp65` projects.
