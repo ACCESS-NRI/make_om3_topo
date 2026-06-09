@@ -36,8 +36,12 @@ ln -sf "$INPUT_GEBCO" ./GEBCO_2024.nc
 # Fill cells that have a sea area fraction smaller than 0.5
 ./bathymetry-tools/bin/topogtools fill_fraction -i topog_new_min_dy.nc -o topog_new_fillfraction.nc  --fraction 0.5
 
-# Apply hand-edits (to ensure Black Sea is connected to Mediterranean)
-python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_edited.nc topog_new_fillfraction.nc
+# Apply hand-edits if supplied
+if [ -n "$EDIT_TOPO_FILE" ]; then
+    python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_edited.nc topog_new_fillfraction.nc
+else
+    cp topog_new_fillfraction.nc topog_new_fillfraction_edited.nc
+fi
 
 # Remove seas according to C-grid rules (need this for merge with B-grid version so they both have nans on land)
 ./bathymetry-tools/bin/topogtools deseas -i topog_new_fillfraction_edited.nc -o topog_new_fillfraction_edited_deseas.nc --grid_type C
@@ -48,8 +52,12 @@ python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_F
 # Make a copy for B grid, setting depth:grid_type = "B" so fix_nonadvective will run
 ncatted -O --output topog_new_fillfraction_B.nc -a grid_type,depth,o,c,B topog_new_fillfraction_edited_deseas.nc
 
-# Apply hand-edits to ensure Mediterranean Sea, Black Sea, Sea of Azov and Gulf of Riga survive deseas with B-grid rules
-python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_BGRID_FILE" --output topog_new_fillfraction_B_edited.nc topog_new_fillfraction_B.nc
+# Apply B-grid hand-edits if supplied
+if [ -n "$EDIT_TOPO_BGRID_FILE" ]; then
+    python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_BGRID_FILE" --output topog_new_fillfraction_B_edited.nc topog_new_fillfraction_B.nc
+else
+    cp topog_new_fillfraction_B.nc topog_new_fillfraction_B_edited.nc
+fi
 
 # Fix B-grid non-advective coastal cells according to B-grid rules
 ./bathymetry-tools/bin/topogtools fix_nonadvective --coastal-cells --input topog_new_fillfraction_B_edited.nc --output topog_new_fillfraction_B_edited_fixnonadvective.nc --vgrid ocean_vgrid.nc --vgrid_type mom6
@@ -60,8 +68,12 @@ python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_B
 # Merge B-grid and C-grid versions, using C-grid in all ice-free regions
 ./combine_by_mask.py topog_new_fillfraction_edited_deseas.nc topog_new_fillfraction_B_edited_fixnonadvective_deseas.nc "$B_MASK_FILE" topog_new_fillfraction_merged.nc
 
-# Apply hand-edits (again) - WARNING: avoid edits that create B-grid non-advective cells in ice-prone areas!
-python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_merged_edited.nc topog_new_fillfraction_merged.nc
+# Apply hand-edits again if supplied
+if [ -n "$EDIT_TOPO_FILE" ]; then
+    python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_merged_edited.nc topog_new_fillfraction_merged.nc
+else
+    cp topog_new_fillfraction_merged.nc topog_new_fillfraction_merged_edited.nc
+fi
 
 # Remove seas according to C-grid rules
 ./bathymetry-tools/bin/topogtools deseas -i topog_new_fillfraction_merged_edited.nc -o topog_new_fillfraction_merged_edited_deseas.nc --grid_type C
