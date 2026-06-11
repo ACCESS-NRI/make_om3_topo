@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 #PBS -q normal
-#PBS -l walltime=4:00:00
+#PBS -l walltime=24:00:00
 #PBS -l ncpus=14
-#PBS -l mem=50GB
+#PBS -l mem=190GB
 #PBS -l wd
 #PBS -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/x77+gdata/av17
 
