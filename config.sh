@@ -42,7 +42,7 @@ case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
         ROF_WEIGHTS_FILE='access-om3-8km-rof-remap-weights.nc'
         ROFI_SPREAD_FILE='access-om3-8km-rofi-climatology.nc'
         EDIT_TOPO_FILE=
-        EDIT_TOPO_BGRID_FILE=
+        EDIT_TOPO_BGRID_FILE='edit_8km_topog_Bgrid.txt'
         ;;
     100km)
         RESOLUTION='100km'
