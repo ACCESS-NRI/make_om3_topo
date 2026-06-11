@@ -26,7 +26,6 @@ git push || true
 
 ncatted -O -h -a history,global,a,c," | Created on $(date) using https://github.com/ACCESS-NRI/make_OM3_025deg_topo/tree/$(git rev-parse --short HEAD) and based on GEBCO_2024 topography" topog.nc
 ncatted -O -h -a history,global,a,c," | Created on $(date) using https://github.com/ACCESS-NRI/make_OM3_025deg_topo/tree/$(git rev-parse --short HEAD)" kmt.nc
-ncatted -O -h -a history,global,a,c," | Updated on $(date) using https://github.com/ACCESS-NRI/make_OM3_025deg_topo/tree/$(git rev-parse --short HEAD)" ocean_vgrid.nc
 
 for file in topog.nc kmt.nc ocean_vgrid.nc; do
     ncatted -O -h -a resolution,global,o,c,"$RESOLUTION" "$file"
