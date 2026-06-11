@@ -54,7 +54,7 @@ INPUTS_JOB=$(qsub <<EOF
 #!/bin/bash
 #PBS -q normal
 #PBS -N inputs_generation
-#PBS -l walltime=8:00:00
+#PBS -l walltime=48:00:00
 #PBS -l ncpus=48
 #PBS -l mem=190GB
 #PBS -l wd
