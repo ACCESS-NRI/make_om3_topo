@@ -20,7 +20,7 @@ require_file() {
 case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
     25km|025deg|0.25deg)
         RESOLUTION='25km'
-        INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.25km/2026.05.27/ocean_hgrid.nc'
+        INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.25km/2026.06.11/ocean_hgrid.nc'
         INPUT_VGRID='/g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc'
         B_MASK_FILE='B_mask_25km.nc'
         CUTOFF_VALUE=6000
