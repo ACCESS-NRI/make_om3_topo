@@ -595,3 +595,10 @@ editTopo.py edits file version 1
   158  532  125.86489868164062  0.0
   175  533  668.651123046875    0.0
   174  533  730.9348754882812   0.0
+# Remove some dead end bays which get stuck sea ice
+# see https://github.com/ACCESS-NRI/access-om3-configs/issues/409#issuecomment-5276886954
+  987  1090  63.92143249511719  0.0
+  987  1091  89.80646514892578  0.0
+  988  1091  282.0208740234375  0.0
+  351  125  103.62161254882812  0.0
+  1347  204  119.42333221435547  0.0
