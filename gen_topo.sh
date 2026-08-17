@@ -112,3 +112,9 @@ ncatted -O -h -a ocean_mask_file,global,a,c,"$(readlink -f ocean_mask.nc) (md5su
 
 # Remove the intermediate ocean_mask.nc
 rm -f ocean_mask.nc
+
+# Write an accompanying README.md for topog.nc/kmt.nc, following the om3-scripts convention.
+# Only list genuinely external inputs here - edit_*_topog*.txt and B_mask_*.nc are already
+# tracked in this git repo, so their provenance is covered by the commit hash above instead.
+README_INPUT_FILES="$INPUT_HGRID $INPUT_VGRID $INPUT_GEBCO"
+python3 write_topog_readme.py "./gen_topo.sh $RESOLUTION (USE_BGRID_MERGE=$USE_BGRID_MERGE)" $README_INPUT_FILES
