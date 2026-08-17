@@ -45,32 +45,38 @@ python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_F
 # Set maximum/minimum depth (so we have a C-grid-only version for comparison with the merged B- and C-grid topog.nc)
 ./bathymetry-tools/bin/topogtools min_max_depth -i topog_new_fillfraction_edited_deseas.nc -o topog_new_fillfraction_edited_deseas_mindepth.nc --level 7 --vgrid ocean_vgrid.nc --vgrid_type mom6
 
-# Make a copy for B grid, setting depth:grid_type = "B" so fix_nonadvective will run
-ncatted -O --output topog_new_fillfraction_B.nc -a grid_type,depth,o,c,B topog_new_fillfraction_edited_deseas.nc
+if [ "$USE_BGRID_MERGE" = "true" ]; then
+    # Make a copy for B grid, setting depth:grid_type = "B" so fix_nonadvective will run
+    ncatted -O --output topog_new_fillfraction_B.nc -a grid_type,depth,o,c,B topog_new_fillfraction_edited_deseas.nc
 
-# Apply hand-edits to ensure Mediterranean Sea, Black Sea, Sea of Azov and Gulf of Riga survive deseas with B-grid rules
-python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_BGRID_FILE" --output topog_new_fillfraction_B_edited.nc topog_new_fillfraction_B.nc
+    # Apply hand-edits to ensure Mediterranean Sea, Black Sea, Sea of Azov and Gulf of Riga survive deseas with B-grid rules
+    python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_BGRID_FILE" --output topog_new_fillfraction_B_edited.nc topog_new_fillfraction_B.nc
 
-# Fix B-grid non-advective coastal cells according to B-grid rules
-./bathymetry-tools/bin/topogtools fix_nonadvective --coastal-cells --input topog_new_fillfraction_B_edited.nc --output topog_new_fillfraction_B_edited_fixnonadvective.nc --vgrid ocean_vgrid.nc --vgrid_type mom6
+    # Fix B-grid non-advective coastal cells according to B-grid rules
+    ./bathymetry-tools/bin/topogtools fix_nonadvective --coastal-cells --input topog_new_fillfraction_B_edited.nc --output topog_new_fillfraction_B_edited_fixnonadvective.nc --vgrid ocean_vgrid.nc --vgrid_type mom6
 
-# Remove seas in B-grid file according to B-grid rules
-./bathymetry-tools/bin/topogtools deseas -i topog_new_fillfraction_B_edited_fixnonadvective.nc -o topog_new_fillfraction_B_edited_fixnonadvective_deseas.nc --grid_type B
+    # Remove seas in B-grid file according to B-grid rules
+    ./bathymetry-tools/bin/topogtools deseas -i topog_new_fillfraction_B_edited_fixnonadvective.nc -o topog_new_fillfraction_B_edited_fixnonadvective_deseas.nc --grid_type B
 
-# Merge B-grid and C-grid versions, using C-grid in all ice-free regions
-./combine_by_mask.py topog_new_fillfraction_edited_deseas.nc topog_new_fillfraction_B_edited_fixnonadvective_deseas.nc "$B_MASK_FILE" topog_new_fillfraction_merged.nc
+    # Merge B-grid and C-grid versions, using C-grid in all ice-free regions
+    ./combine_by_mask.py topog_new_fillfraction_edited_deseas.nc topog_new_fillfraction_B_edited_fixnonadvective_deseas.nc "$B_MASK_FILE" topog_new_fillfraction_merged.nc
 
-# Apply hand-edits (again) - WARNING: avoid edits that create B-grid non-advective cells in ice-prone areas!
-python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_merged_edited.nc topog_new_fillfraction_merged.nc
+    # Apply hand-edits (again) - WARNING: avoid edits that create B-grid non-advective cells in ice-prone areas!
+    python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_merged_edited.nc topog_new_fillfraction_merged.nc
 
-# Remove seas according to C-grid rules
-./bathymetry-tools/bin/topogtools deseas -i topog_new_fillfraction_merged_edited.nc -o topog_new_fillfraction_merged_edited_deseas.nc --grid_type C
+    # Remove seas according to C-grid rules
+    ./bathymetry-tools/bin/topogtools deseas -i topog_new_fillfraction_merged_edited.nc -o topog_new_fillfraction_merged_edited_deseas.nc --grid_type C
 
-# Set maximum/minimum depth
-./bathymetry-tools/bin/topogtools min_max_depth -i topog_new_fillfraction_merged_edited_deseas.nc -o topog_new_fillfraction_merged_edited_deseas_mindepth.nc --level 7 --vgrid ocean_vgrid.nc --vgrid_type mom6
+    # Set maximum/minimum depth
+    ./bathymetry-tools/bin/topogtools min_max_depth -i topog_new_fillfraction_merged_edited_deseas.nc -o topog_new_fillfraction_merged_edited_deseas_mindepth.nc --level 7 --vgrid ocean_vgrid.nc --vgrid_type mom6
+
+    FINAL_TOPOG="topog_new_fillfraction_merged_edited_deseas_mindepth.nc"
+else
+    FINAL_TOPOG="topog_new_fillfraction_edited_deseas_mindepth.nc"
+fi
 
 # Name final topog as topog.nc
-cp topog_new_fillfraction_merged_edited_deseas_mindepth.nc topog.nc
+cp "$FINAL_TOPOG" topog.nc
 
 # add name and checksum for input files
 MD5SUM=$(md5sum "$INPUT_HGRID" | awk '{print $1}')
@@ -79,8 +85,10 @@ MD5SUM=$(md5sum "$INPUT_VGRID" | awk '{print $1}')
 ncatted -O -h -a input_file,global,a,c,"$(readlink -f "$INPUT_VGRID") (md5sum:$MD5SUM) ; " topog.nc
 MD5SUM=$(md5sum "$INPUT_GEBCO" | awk '{print $1}')
 ncatted -O -h -a input_file,global,a,c,"$(readlink -f "$INPUT_GEBCO") (md5sum:$MD5SUM) ; " topog.nc
-MD5SUM=$(md5sum "$B_MASK_FILE" | awk '{print $1}')
-ncatted -O -h -a input_file,global,a,c,"$(readlink -f "$B_MASK_FILE") (md5sum:$MD5SUM) ; " topog.nc
+if [ "$USE_BGRID_MERGE" = "true" ]; then
+    MD5SUM=$(md5sum "$B_MASK_FILE" | awk '{print $1}')
+    ncatted -O -h -a input_file,global,a,c,"$(readlink -f "$B_MASK_FILE") (md5sum:$MD5SUM) ; " topog.nc
+fi
 
 # Move intermediate files to a separate directory
 OUTPUT_DIR="topography_intermediate_output"
@@ -104,3 +112,9 @@ ncatted -O -h -a ocean_mask_file,global,a,c,"$(readlink -f ocean_mask.nc) (md5su
 
 # Remove the intermediate ocean_mask.nc
 rm -f ocean_mask.nc
+
+# Write an accompanying README.md for topog.nc/kmt.nc, following the om3-scripts convention.
+# Only list genuinely external inputs here - edit_*_topog*.txt and B_mask_*.nc are already
+# tracked in this git repo, so their provenance is covered by the commit hash above instead.
+README_INPUT_FILES="$INPUT_HGRID $INPUT_VGRID $INPUT_GEBCO"
+python3 write_topog_readme.py "./gen_topo.sh $RESOLUTION (USE_BGRID_MERGE=$USE_BGRID_MERGE)" $README_INPUT_FILES

@@ -4,8 +4,8 @@ Makes resolution-specific `topog.nc` MOM6 global bathymetry files for ACCESS-OM3
 
 The workflow [`gen_topo.sh`](https://github.com/ACCESS-NRI/make_om3_topo/blob/main/gen_topo.sh) contains many steps, and stores intermediate files in `topography_intermediate_output` so you can check the result of each step. Key stages in the processing are:
 - Interpolate GEBCO onto the model grid, setting each cell's altitude to the mean of the GEBCO data within it and setting cells that contain more than 50% land in GEBCO to 100% land in the model (this rule of thumb gives acceptable results in most places but requires some specific fixes to ensure important straits, sills, etc. are well represented).
-- Create two global topographies, one (`topog_new_fillfraction_edited_deseas.nc`) with a coastline suitable for a C-grid (i.e. with 1-cell-wide channels) and another (`topog_new_fillfraction_B_edited_fixnonadvective_deseas.nc`) with a coastline suitable for both a B-grid and C-grid (i.e. all 1-cell-wide channels are closed off or widened to at least 2 cells); these are identical apart from coastal points and any embayments/channels that are cut off by closing 1-cell-wide channels in the B-grid version.
-- These are then merged with `combine_by_mask.py` using the mask `B_mask.nc` such the B-grid version is used in regions prone to sea ice and the C-grid version everywhere else. This allows the use of B-grid CICE6 with C-grid MOM6 without [ice piling up](https://github.com/ACCESS-NRI/access-om3-configs/issues/1010) in narrow channels and inlets.
+- Produce a global topography (`topog_new_fillfraction_edited_deseas.nc`) with a coastline suitable for a C-grid (i.e. with 1-cell-wide channels).
+- (optional, `USE_BGRID_MERGE=true`) Also create a second topography (`topog_new_fillfraction_B_edited_fixnonadvective_deseas.nc`) with a coastline suitable for both a B-grid and C-grid (i.e. all 1-cell-wide channels are closed off or widened to at least 2 cells); this is identical to the C-grid version apart from coastal points and any embayments/channels that are cut off by closing 1-cell-wide channels. It is then merged with `combine_by_mask.py` using the mask `B_mask.nc` such the B-grid version is used in regions prone to sea ice and the C-grid version everywhere else. This allows the use of B-grid CICE6 with C-grid MOM6 without [ice piling up](https://github.com/ACCESS-NRI/access-om3-configs/issues/1010) in narrow channels and inlets. This step is off by default — set `USE_BGRID_MERGE=true` to enable it (see step 3 below).
 - Further processing and edits to generate the final `topog.nc`.
 - Generation of associated .nc files based on and consistent with `topog.nc`.
 
@@ -41,6 +41,11 @@ The workflow [`gen_topo.sh`](https://github.com/ACCESS-NRI/make_om3_topo/blob/ma
    ./gen_topo.sh 100km
    qsub -v RESOLUTION=25km -P $PROJECT gen_topo.sh
    ```
+   - the B-grid merge steps (using `B_mask.nc` and `edit_*_topog_Bgrid.txt`, see step 5) are off by default. To enable them, set `USE_BGRID_MERGE=true`:
+   ```bash
+   USE_BGRID_MERGE=true ./gen_topo.sh 100km
+   qsub -v RESOLUTION=25km,USE_BGRID_MERGE=true -P $PROJECT gen_topo.sh
+   ```
    - after generating the topography, this will then generate most other masks, forcing and remapping files needed by OM3
 
 4. **Check the output files look OK**
@@ -51,8 +56,8 @@ The workflow [`gen_topo.sh`](https://github.com/ACCESS-NRI/make_om3_topo/blob/ma
 5. **Fix problems (if any)**
 
    Since all outputs are generated from `topog.nc`, problems in any of the outputs can generally be fixed by altering the edits applied as part of generating `topog.nc` in the workflow. There are two resolution-specific files containing lists of edits, which are applied by `editTopo.py` in [`gen_topo.sh`](https://github.com/ACCESS-NRI/make_om3_topo/blob/main/gen_topo.sh):
-   - edit_025deg_topog.txt is applied twice, once to the precursor to the B- and C-grid files which are later merged, and then again to the merged file.  
-   - edit_025deg_topog_Bgrid.txt is applied only to the B-grid file prior to merging but after the first application of edit_025deg_topog.txt. This should apply fixes that are suitable for a global B-grid, e.g. to open the Bosphorus so the Black Sea is retained.
+   - edit_025deg_topog.txt is always applied, to the C-grid topography. If `USE_BGRID_MERGE=true`, it is applied a second time to the merged file.
+   - edit_025deg_topog_Bgrid.txt is only used when `USE_BGRID_MERGE=true`; it is applied to the B-grid file prior to merging but after the first application of edit_025deg_topog.txt. This should apply fixes that are suitable for a global B-grid, e.g. to open the Bosphorus so the Black Sea is retained.
    - For the 100 km workflow, the same procedure is used, but with the corresponding edit files `edit_100km_topog.txt` and `edit_100km_topog_Bgrid.txt`.
    - Run `bathymetry-tools/editTopo.py` on the appropriate intermediate files to generate new lists of edits which can be appended (with explanatory comments) to the relevant edit file for your chosen resolution.
    - Return to step 3 to check that the updated workflow does what you want.

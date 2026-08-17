@@ -5,9 +5,15 @@ DEFAULT_RESOLUTION="${DEFAULT_RESOLUTION:-25km}"
 RESOLUTION_INPUT="${1:-${RESOLUTION:-$DEFAULT_RESOLUTION}}"
 INPUT_GEBCO='/g/data/ik11/inputs/GEBCO_2024/GEBCO_2024.nc'
 
+# Whether to run the B-grid merge steps (fix_nonadvective, B-grid deseas, combine_by_mask,
+# applying $EDIT_TOPO_BGRID_FILE) that produce a topog.nc merging B-grid coastlines into
+# sea-ice-prone regions. Off by default; set to "true" to enable.
+USE_BGRID_MERGE="${USE_BGRID_MERGE:-false}"
+
 usage() {
     echo "Usage: $0 [25km|100km]" >&2
     echo "Set RESOLUTION=25km or RESOLUTION=100km to use qsub -v instead of a positional argument." >&2
+    echo "Set USE_BGRID_MERGE=true to enable the optional B-grid merge steps (default: false)." >&2
 }
 
 require_file() {
@@ -53,6 +59,9 @@ esac
 require_file "$INPUT_HGRID"
 require_file "$INPUT_VGRID"
 require_file "$INPUT_GEBCO"
-require_file "$B_MASK_FILE"
 require_file "$EDIT_TOPO_FILE"
-require_file "$EDIT_TOPO_BGRID_FILE"
+
+if [ "$USE_BGRID_MERGE" = "true" ]; then
+    require_file "$B_MASK_FILE"
+    require_file "$EDIT_TOPO_BGRID_FILE"
+fi
