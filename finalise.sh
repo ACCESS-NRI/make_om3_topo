@@ -17,6 +17,8 @@ module load nco
 module load git
 module use /g/data/xp65/public/modules
 module load conda/analysis3-25.11
+module use /g/data/vk83/modules
+module load model-tools/fre-nctools/2024.05-1
 
 set -x
 set -e
@@ -111,3 +113,14 @@ EOF
 echo "Submitted tidal amplitude job: $TIDAL_JOB"
 
 bash ./om3-scripts/external_tidal_generation/submit_bottom_roughness.sh -s ./ -r "$RESOLUTION" -p true -g ocean_hgrid.nc -t topog.nc -j ./om3-scripts/external_tidal_generation/pbs_bottom_roughness.pbs
+
+# Create mask table for the configured processor layout (defined in config.sh)
+# The mask table depends on this layout and must be regenerate if it changes
+if [ -n "${MASKTABLE_LAYOUT_X:-}" ] && [ -n "${MASKTABLE_LAYOUT_Y:-}" ]; then
+    python3 ./om3-scripts/masktable_generation/gen_masktable.py \
+        -g ocean_hgrid.nc \
+        -t topog.nc \
+        -l "$MASKTABLE_LAYOUT_X" "$MASKTABLE_LAYOUT_Y" \
+        -m mom6 \
+        -a
+fi
