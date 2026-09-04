@@ -36,6 +36,10 @@ case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
         ROFI_SPREAD_FILE='access-om3-25km-rofi-climatology.nc'
         EDIT_TOPO_FILE='edit_25km_topog.txt'
         EDIT_TOPO_BGRID_FILE='edit_25km_topog_Bgrid.txt'
+        # processor layout used for mask-table generation
+        # update these values if the target configuration decomposition changes
+        MASKTABLE_LAYOUT_X=72
+        MASKTABLE_LAYOUT_Y=48
         ;;
     100km)
         RESOLUTION='100km'
