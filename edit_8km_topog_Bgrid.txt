@@ -1,0 +1,13 @@
+editTopo.py edits file version 1
+#
+# This file can be used as an argument for editTopo.py --apply
+#
+# Edits to ensure Gibraltar strait remain open on a B-grid,
+# created: Thu Jun 11 15:52:58 2026
+# by: ek4684
+# via: ./bathymetry-tools/editTopo.py ./topography_intermediate_output/topog_new_fillfraction_B.nc
+#
+#    i     j  old                      new
+  3294  2389  -1.0000000150474662e+30  194.69000244140625
+  3295  2389  -1.0000000150474662e+30  194.69000244140625
+  3293  2391  -1.0000000150474662e+30  107.77100372314453

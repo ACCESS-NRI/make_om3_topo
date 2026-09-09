@@ -36,8 +36,12 @@ ln -sf "$INPUT_GEBCO" ./GEBCO_2024.nc
 # Fill cells that have a sea area fraction smaller than 0.5
 ./bathymetry-tools/bin/topogtools fill_fraction -i topog_new_min_dy.nc -o topog_new_fillfraction.nc  --fraction 0.5
 
-# Apply hand-edits (to ensure Black Sea is connected to Mediterranean)
-python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_edited.nc topog_new_fillfraction.nc
+# Apply hand-edits when the selected resolution has an edit file.
+if [ -n "$EDIT_TOPO_FILE" ]; then
+    python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_edited.nc topog_new_fillfraction.nc
+else
+    cp topog_new_fillfraction.nc topog_new_fillfraction_edited.nc
+fi
 
 # Remove seas according to C-grid rules (need this for merge with B-grid version so they both have nans on land)
 ./bathymetry-tools/bin/topogtools deseas -i topog_new_fillfraction_edited.nc -o topog_new_fillfraction_edited_deseas.nc --grid_type C
@@ -62,7 +66,11 @@ if [ "$USE_BGRID_MERGE" = "true" ]; then
     ./combine_by_mask.py topog_new_fillfraction_edited_deseas.nc topog_new_fillfraction_B_edited_fixnonadvective_deseas.nc "$B_MASK_FILE" topog_new_fillfraction_merged.nc
 
     # Apply hand-edits (again) - WARNING: avoid edits that create B-grid non-advective cells in ice-prone areas!
-    python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_merged_edited.nc topog_new_fillfraction_merged.nc
+    if [ -n "$EDIT_TOPO_FILE" ]; then
+        python3 ./bathymetry-tools/editTopo.py --overwrite --nogui --apply "$EDIT_TOPO_FILE" --output topog_new_fillfraction_merged_edited.nc topog_new_fillfraction_merged.nc
+    else
+        cp topog_new_fillfraction_merged.nc topog_new_fillfraction_merged_edited.nc
+    fi
 
     # Remove seas according to C-grid rules
     ./bathymetry-tools/bin/topogtools deseas -i topog_new_fillfraction_merged_edited.nc -o topog_new_fillfraction_merged_edited_deseas.nc --grid_type C

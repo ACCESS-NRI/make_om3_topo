@@ -11,8 +11,8 @@ INPUT_GEBCO='/g/data/ik11/inputs/GEBCO_2024/GEBCO_2024.nc'
 USE_BGRID_MERGE="${USE_BGRID_MERGE:-false}"
 
 usage() {
-    echo "Usage: $0 [25km|100km]" >&2
-    echo "Set RESOLUTION=25km or RESOLUTION=100km to use qsub -v instead of a positional argument." >&2
+    echo "Usage: $0 [25km|8km|100km]" >&2
+    echo "Set RESOLUTION=25km, RESOLUTION=8km or RESOLUTION=100km to use qsub -v instead of a positional argument." >&2
     echo "Set USE_BGRID_MERGE=true to enable the optional B-grid merge steps (default: false)." >&2
 }
 
@@ -41,6 +41,23 @@ case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
         MASKTABLE_LAYOUT_X=72
         MASKTABLE_LAYOUT_Y=48
         ;;
+    8km)
+        RESOLUTION='8km'
+        INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.8km/2026.09.08/ocean_hgrid.nc'
+        INPUT_VGRID='/g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc'
+        B_MASK_FILE='B_mask_8km.nc'
+        CUTOFF_VALUE=2000
+        ESMF_MESH_FILE='access-om3-8km-ESMFmesh.nc'
+        ESMF_NO_MASK_MESH_FILE='access-om3-8km-nomask-ESMFmesh.nc'
+        ROF_WEIGHTS_FILE='access-om3-8km-rof-remap-weights.nc'
+        ROFI_SPREAD_FILE='access-om3-8km-rofi-climatology.nc'
+        EDIT_TOPO_FILE=''
+        EDIT_TOPO_BGRID_FILE='edit_8km_topog_Bgrid.txt'
+        # processor layout used for mask-table generation
+        # update these values if the target configuration decomposition changes
+        MASKTABLE_LAYOUT_X=86
+        MASKTABLE_LAYOUT_Y=80
+        ;;
     100km)
         RESOLUTION='100km'
         INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/mom/grids/mosaic/global.100km/2026.03.13/ocean_hgrid.nc'
@@ -63,7 +80,7 @@ esac
 require_file "$INPUT_HGRID"
 require_file "$INPUT_VGRID"
 require_file "$INPUT_GEBCO"
-require_file "$EDIT_TOPO_FILE"
+[ -z "$EDIT_TOPO_FILE" ] || require_file "$EDIT_TOPO_FILE"
 
 if [ "$USE_BGRID_MERGE" = "true" ]; then
     require_file "$B_MASK_FILE"
