@@ -14,18 +14,6 @@ module load conda/analysis3-25.11
 module use /g/data/vk83/modules
 module load model-tools/fre-nctools/2024.05-1
 
-# check if the intermediate bottom roughness remains current; no regeneration done.
-if python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
-    --check \
-    --woa-temp-file "$INPUT_WOA_TEMP" \
-    --woa-salt-file "$INPUT_WOA_SALT" \
-    --synbath-file "$INPUT_SYNBATH" \
-    --output "$BOTTOM_ROUGHNESS_INTERMEDIATE"; then
-    BOTTOM_ROUGHNESS_PREPARE_ARGS="--check"
-else
-    BOTTOM_ROUGHNESS_PREPARE_ARGS=""
-fi
-
 # Check configuration before the existing commit/push prompt or any submissions.
 echo "About to commit all changes to git repository and push to remote."
 read -p "Proceed? (y/n) " yesno
@@ -67,7 +55,7 @@ ROF_NY=$2
 #Make mesh / weights /wombatlite files
 INPUTS_JOB=$(qsub <<EOF
 #!/bin/bash
-#PBS -q normal
+#PBS -q normalsr
 #PBS -N inputs_generation
 #PBS -l walltime=10:00:00
 #PBS -l ncpus=72
@@ -83,17 +71,16 @@ module load conda/analysis3-25.11
 set -x
 set -e
 
-# Recheck inside PBS. When stale, this generates the intermediate bottom roughness using
-# all allocated cpus; when current, --check only verifies that it stays current.
+# The intermediate bottom-roughness dataset is grid-independent and shared between OM3 resolutions.
+# Reuse the intermediate when its provenance matches; otherwise generate it using this PBS allocation.
+
 python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
     --woa-temp-file="$INPUT_WOA_TEMP" \
     --woa-salt-file="$INPUT_WOA_SALT" \
     --synbath-file="$INPUT_SYNBATH" \
-    --output="$BOTTOM_ROUGHNESS_INTERMEDIATE" \
-    $BOTTOM_ROUGHNESS_PREPARE_ARGS
+    --output="$BOTTOM_ROUGHNESS_INTERMEDIATE"
 
-# Read the shared intermediate and produce this grid bottom_roughness.nc.
-# This separate Python process runs in INPUTS_JOB, without another qsub or mpirun.
+# Regrid after the intermediate is ready
 python3 ./om3-scripts/external_tidal_generation/generate_bottom_roughness_regrid.py \
     --woa_intermediate_file="$BOTTOM_ROUGHNESS_INTERMEDIATE" \
     --topog_file=topog.nc \
