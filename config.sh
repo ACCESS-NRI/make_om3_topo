@@ -5,6 +5,15 @@ DEFAULT_RESOLUTION="${DEFAULT_RESOLUTION:-25km}"
 RESOLUTION_INPUT="${1:-${RESOLUTION:-$DEFAULT_RESOLUTION}}"
 INPUT_GEBCO='/g/data/ik11/inputs/GEBCO_2024/GEBCO_2024.nc'
 
+# Inputs used to generate the grid-independent bottom roughness intermediate
+INPUT_WOA_TEMP="${INPUT_WOA_TEMP:-/g/data/av17/access-nri/OM3/woa23/annual_files/corrected_times/woa23_decav_t00_04.nc}"
+INPUT_WOA_SALT="${INPUT_WOA_SALT:-/g/data/av17/access-nri/OM3/woa23/annual_files/corrected_times/woa23_decav_s00_04.nc}"
+INPUT_SYNBATH="${INPUT_SYNBATH:-/g/data/av17/access-nri/OM3/SYNBATH/SYNBATH_V1.2.nc}"
+
+# Shared intermediate filename. finalise.sh checks it and when necessary
+# generates it at the start of the existing inputs PBS job before regridding
+BOTTOM_ROUGHNESS_INTERMEDIATE="${BOTTOM_ROUGHNESS_INTERMEDIATE:-/g/data/tm70/ml0072/COMMON/git_repos/make_om3_topo/bottom_roughness_intermediate.nc}"
+
 # Whether to run the B-grid merge steps (fix_nonadvective, B-grid deseas, combine_by_mask,
 # applying $EDIT_TOPO_BGRID_FILE) that produce a topog.nc merging B-grid coastlines into
 # sea-ice-prone regions. Off by default; set to "true" to enable.
@@ -26,6 +35,8 @@ require_file() {
 case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
     25km|025deg|0.25deg)
         RESOLUTION='25km'
+        # https://github.com/ACCESS-NRI/om3-scripts/pull/105#issuecomment-3942010809
+        BOTTOM_ROUGHNESS_METHOD="bilinear"
         INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.25km/2026.06.11/ocean_hgrid.nc'
         INPUT_VGRID='/g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc'
         B_MASK_FILE='B_mask_25km.nc'
@@ -60,6 +71,8 @@ case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
         ;;
     100km)
         RESOLUTION='100km'
+        # https://github.com/ACCESS-NRI/om3-scripts/pull/105#issuecomment-3942010809
+        BOTTOM_ROUGHNESS_METHOD="conservative_normed"
         INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/mom/grids/mosaic/global.100km/2026.03.13/ocean_hgrid.nc'
         INPUT_VGRID='/g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc'
         B_MASK_FILE='B_mask_100km.nc'
@@ -80,6 +93,9 @@ esac
 require_file "$INPUT_HGRID"
 require_file "$INPUT_VGRID"
 require_file "$INPUT_GEBCO"
+require_file "$INPUT_WOA_TEMP"
+require_file "$INPUT_WOA_SALT"
+require_file "$INPUT_SYNBATH"
 [ -z "$EDIT_TOPO_FILE" ] || require_file "$EDIT_TOPO_FILE"
 
 if [ "$USE_BGRID_MERGE" = "true" ]; then

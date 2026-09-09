@@ -6,19 +6,33 @@
 
 source ./config.sh
 
-echo "About to commit all changes to git repository and push to remote."
-read -p "Proceed? (y/n) " yesno
-case $yesno in
-   [Yy] ) ;;
-      * ) echo "Cancelled."; exit 0;;
-esac
-
+module purge
 module load nco
 module load git
 module use /g/data/xp65/public/modules
 module load conda/analysis3-25.11
 module use /g/data/vk83/modules
 module load model-tools/fre-nctools/2024.05-1
+
+# check if the intermediate bottom roughness remains current; no regeneration done.
+if python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+    --check \
+    --woa-temp-file "$INPUT_WOA_TEMP" \
+    --woa-salt-file "$INPUT_WOA_SALT" \
+    --synbath-file "$INPUT_SYNBATH" \
+    --output "$BOTTOM_ROUGHNESS_INTERMEDIATE"; then
+    BOTTOM_ROUGHNESS_PREPARE_ARGS="--check"
+else
+    BOTTOM_ROUGHNESS_PREPARE_ARGS=""
+fi
+
+# Check configuration before the existing commit/push prompt or any submissions.
+echo "About to commit all changes to git repository and push to remote."
+read -p "Proceed? (y/n) " yesno
+case $yesno in
+   [Yy] ) ;;
+      * ) echo "Cancelled."; exit 0;;
+esac
 
 set -x
 set -e
@@ -55,9 +69,9 @@ INPUTS_JOB=$(qsub <<EOF
 #!/bin/bash
 #PBS -q normal
 #PBS -N inputs_generation
-#PBS -l walltime=8:00:00
-#PBS -l ncpus=48
-#PBS -l mem=190GB
+#PBS -l walltime=10:00:00
+#PBS -l ncpus=72
+#PBS -l mem=500GB
 #PBS -l wd
 #PBS -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/x77+gdata/av17
 
@@ -67,6 +81,27 @@ module load conda/analysis3-25.11
 
 set -x
 set -e
+
+# Recheck inside PBS. When stale, this generates the intermediate bottom roughness using
+# all allocated cpus; when current, --check only verifies that it stays current.
+python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+    --woa-temp-file="$INPUT_WOA_TEMP" \
+    --woa-salt-file="$INPUT_WOA_SALT" \
+    --synbath-file="$INPUT_SYNBATH" \
+    --output="$BOTTOM_ROUGHNESS_INTERMEDIATE" \
+    $BOTTOM_ROUGHNESS_PREPARE_ARGS
+
+# Read the shared intermediate and produce this grid bottom_roughness.nc.
+# This separate Python process runs in INPUTS_JOB, without another qsub or mpirun.
+python3 ./om3-scripts/external_tidal_generation/generate_bottom_roughness_regrid.py \
+    --woa_intermediate_file="$BOTTOM_ROUGHNESS_INTERMEDIATE" \
+    --topog_file=topog.nc \
+    --hgrid_file=ocean_hgrid.nc \
+    --output_file=bottom_roughness.nc \
+    --method="$BOTTOM_ROUGHNESS_METHOD" \
+    --periodic_regrid \
+    --periodic_lon_laplace \
+    > "log_bottom_roughness_regrid_${RESOLUTION}.log" 2>&1
 
 # Create ESMF mesh from hgrid and topog.nc
 python3 ./om3-scripts/mesh_generation/generate_mesh.py --grid-type=mom --grid-filename=ocean_hgrid.nc --mesh-filename="$ESMF_MESH_FILE" --topog-filename=topog.nc --wrap-lons True
@@ -89,7 +124,7 @@ python3 ./om3-scripts/wombat_ic_generation/co2_iaf.py --co2-cmip-filename=/g/dat
 
 EOF
 )
-echo "Submitted tidal amplitude job: $INPUTS_JOB"
+echo "Submitted inputs generation job: $INPUTS_JOB"
 
 # Generate tidal files
 TIDAL_JOB=$(qsub <<'EOF'
@@ -111,8 +146,6 @@ python3 ./om3-scripts/external_tidal_generation/generate_tide_amplitude.py --hgr
 EOF
 )
 echo "Submitted tidal amplitude job: $TIDAL_JOB"
-
-bash ./om3-scripts/external_tidal_generation/submit_bottom_roughness.sh -s ./ -r "$RESOLUTION" -p true -g ocean_hgrid.nc -t topog.nc -j ./om3-scripts/external_tidal_generation/pbs_bottom_roughness.pbs
 
 # Create mask table for the configured processor layout (defined in config.sh)
 # The mask table depends on this layout and must be regenerate if it changes
