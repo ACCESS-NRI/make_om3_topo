@@ -8,7 +8,7 @@ INPUT_GEBCO='/g/data/ik11/inputs/GEBCO_2024/GEBCO_2024.nc'
 # Inputs used to generate the grid-independent bottom roughness intermediate
 INPUT_WOA_TEMP="${INPUT_WOA_TEMP:-/g/data/av17/access-nri/OM3/woa23/annual_files/corrected_times/woa23_decav_t00_04.nc}"
 INPUT_WOA_SALT="${INPUT_WOA_SALT:-/g/data/av17/access-nri/OM3/woa23/annual_files/corrected_times/woa23_decav_s00_04.nc}"
-INPUT_SYNBATH="${INPUT_SYNBATH:-/g/data/av17/access-nri/OM3/SYNBATH/SYNBATH_V1.2.nc}"
+INPUT_SYNBATH="${INPUT_SYNBATH:-/g/data/av17/access-nri/OM3/SYNBATH/SYNBATH_V2.0.nc}"
 
 # Shared intermediate filename. finalise.sh checks it and when necessary
 # generates it at the start of the existing inputs PBS job before regridding
