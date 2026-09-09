@@ -74,6 +74,7 @@ INPUTS_JOB=$(qsub <<EOF
 #PBS -l mem=500GB
 #PBS -l wd
 #PBS -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/x77+gdata/av17
+#PBS -W umask=022
 
 module purge
 module use /g/data/xp65/public/modules
@@ -136,6 +137,7 @@ TIDAL_JOB=$(qsub <<'EOF'
 #PBS -l mem=190GB
 #PBS -l wd
 #PBS -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/x77+gdata/av17
+#PBS -W umask=022
 
 module purge
 module use /g/data/xp65/public/modules
