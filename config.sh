@@ -12,7 +12,7 @@ INPUT_SYNBATH="${INPUT_SYNBATH:-/g/data/av17/access-nri/OM3/SYNBATH/SYNBATH_V1.2
 
 # Shared intermediate filename. finalise.sh checks it and when necessary
 # generates it at the start of the existing inputs PBS job before regridding
-BOTTOM_ROUGHNESS_INTERMEDIATE="${BOTTOM_ROUGHNESS_INTERMEDIATE:-/g/data/tm70/ml0072/COMMON/git_repos/make_om3_topo/bottom_roughness_intermediate.nc}"
+BOTTOM_ROUGHNESS_INTERMEDIATE="${BOTTOM_ROUGHNESS_INTERMEDIATE:-/g/data/tm70/ml0072/tmp/bottom_roughness_intermediate.nc}"
 
 # Whether to run the B-grid merge steps (fix_nonadvective, B-grid deseas, combine_by_mask,
 # applying $EDIT_TOPO_BGRID_FILE) that produce a topog.nc merging B-grid coastlines into
