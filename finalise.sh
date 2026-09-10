@@ -73,12 +73,29 @@ set -e
 
 # The intermediate bottom-roughness dataset is grid-independent and shared between OM3 resolutions.
 # Reuse the intermediate when its provenance matches; otherwise generate it using this PBS allocation.
-
-python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+# With read-only `--check`, if the WOA or SYNBATH inputs do not match the provenance in the existing intermediate,
+# the script will exit with an error.
+if python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+    --check \
     --woa-temp-file="$INPUT_WOA_TEMP" \
     --woa-salt-file="$INPUT_WOA_SALT" \
     --synbath-file="$INPUT_SYNBATH" \
     --output="$BOTTOM_ROUGHNESS_INTERMEDIATE"
+then
+    echo "Intermediate bottom roughness is current; reusing it."
+else
+    echo "Intermediate bottom roughness is missing or out of date; generating a new version locally"
+    python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+        --woa-temp-file="$INPUT_WOA_TEMP" \
+        --woa-salt-file="$INPUT_WOA_SALT" \
+        --synbath-file="$INPUT_SYNBATH" \
+        --output="$BOTTOM_ROUGHNESS_STAGING"
+    echo
+    echo "Review and publish $BOTTOM_ROUGHNESS_STAGING through model-config-inputs."
+    echo "Then update it to its vk83 path: $BOTTOM_ROUGHNESS_INTERMEDIATE"
+    echo "and rerun finalise.sh to finish the topo generation."
+    exit 1
+fi
 
 # Regrid after the intermediate is ready
 python3 ./om3-scripts/external_tidal_generation/generate_bottom_roughness_regrid.py \
