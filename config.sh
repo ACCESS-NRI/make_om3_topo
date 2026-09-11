@@ -55,8 +55,8 @@ case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
         EDIT_TOPO_BGRID_FILE='edit_8km_topog_Bgrid.txt'
         # processor layout used for mask-table generation
         # update these values if the target configuration decomposition changes
-        MASKTABLE_LAYOUT_X=86
-        MASKTABLE_LAYOUT_Y=80
+        MASKTABLE_LAYOUT_X=120
+        MASKTABLE_LAYOUT_Y=100
         ;;
     100km)
         RESOLUTION='100km'
