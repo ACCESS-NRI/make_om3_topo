@@ -10,12 +10,14 @@ INPUT_WOA_TEMP="${INPUT_WOA_TEMP:-/g/data/av17/access-nri/OM3/woa23/annual_files
 INPUT_WOA_SALT="${INPUT_WOA_SALT:-/g/data/av17/access-nri/OM3/woa23/annual_files/corrected_times/woa23_decav_s00_04.nc}"
 INPUT_SYNBATH="${INPUT_SYNBATH:-/g/data/av17/access-nri/OM3/SYNBATH/SYNBATH_V2.0.nc}"
 
-# Shared intermediate filename. finalise.sh checks it and when necessary
-# generates it at the start of the existing inputs PBS job before regridding
-BOTTOM_ROUGHNESS_INTERMEDIATE="${BOTTOM_ROUGHNESS_INTERMEDIATE:-/g/data/vk83/configurations/inputs/access-om3/mom/tidal_external_files/intermediate/$(date +%Y.%m.%d)/bottom_roughness_intermediate.nc}"
+# Version of the published and staged bottom roughness intermediate
+BOTTOM_ROUGHNESS_VERSION="${BOTTOM_ROUGHNESS_VERSION:-2026.09.15}"
+
+# Previously published, read-only intermediate checked by finalise.sh
+BOTTOM_ROUGHNESS_INTERMEDIATE="${BOTTOM_ROUGHNESS_INTERMEDIATE:-/g/data/vk83/configurations/inputs/access-om3/mom/tidal_external_files/intermediate/${BOTTOM_ROUGHNESS_VERSION}/bottom_roughness_intermediate.nc}"
 
 # Local staging location used only when a new intermediate is required and generated
-BOTTOM_ROUGHNESS_STAGING="$PWD/bottom_roughness_staging/bottom_roughness_intermediate.nc"
+BOTTOM_ROUGHNESS_STAGING="${BOTTOM_ROUGHNESS_STAGING:-$PWD/bottom_roughness_staging/${BOTTOM_ROUGHNESS_VERSION}/bottom_roughness_intermediate.nc}"
 
 # Whether to run the B-grid merge steps (fix_nonadvective, B-grid deseas, combine_by_mask,
 # applying $EDIT_TOPO_BGRID_FILE) that produce a topog.nc merging B-grid coastlines into
@@ -57,6 +59,8 @@ case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
         ;;
     8km)
         RESOLUTION='8km'
+        # https://github.com/ACCESS-NRI/om3-scripts/pull/105#issuecomment-3942010809
+        BOTTOM_ROUGHNESS_METHOD="bilinear"
         INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.8km/2026.09.08/ocean_hgrid.nc'
         INPUT_VGRID='/g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc'
         B_MASK_FILE='B_mask_8km.nc'

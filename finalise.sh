@@ -72,28 +72,45 @@ set -x
 set -e
 
 # The intermediate bottom-roughness dataset is grid-independent and shared between OM3 resolutions.
-# Reuse the intermediate when its provenance matches; otherwise generate it using this PBS allocation.
-# With read-only `--check`, if the WOA or SYNBATH inputs do not match the provenance in the existing intermediate,
-# the script will exit with an error.
+# 1st - Check the provenance of the published intermediate bottom roughness.
+# If it is missing or out of date, generate a new intermediate locally for review and publication through model-config-inputs.
 if python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
-    --check \
     --woa-temp-file="$INPUT_WOA_TEMP" \
     --woa-salt-file="$INPUT_WOA_SALT" \
     --synbath-file="$INPUT_SYNBATH" \
-    --output="$BOTTOM_ROUGHNESS_INTERMEDIATE"
+    --existing-intermediate="$BOTTOM_ROUGHNESS_INTERMEDIATE"
 then
     echo "Intermediate bottom roughness is current; reusing it."
 else
-    echo "Intermediate bottom roughness is missing or out of date; generating a new version locally"
-    python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
-        --woa-temp-file="$INPUT_WOA_TEMP" \
-        --woa-salt-file="$INPUT_WOA_SALT" \
-        --synbath-file="$INPUT_SYNBATH" \
-        --output="$BOTTOM_ROUGHNESS_STAGING"
+    echo "Intermediate bottom roughness is missing or out of date; prepare to generate a new version locally"
+    if [[ -e "$BOTTOM_ROUGHNESS_STAGING" ]]; then
+        # Check if the previous generated staged file matches the inputs
+        if python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+            --woa-temp-file="$INPUT_WOA_TEMP" \
+            --woa-salt-file="$INPUT_WOA_SALT" \
+            --synbath-file="$INPUT_SYNBATH" \
+            --existing-intermediate="$BOTTOM_ROUGHNESS_STAGING"
+        then
+            echo "Staged bottom roughness is current; reusing it."
+            echo "Review and publish $BOTTOM_ROUGHNESS_STAGING through model-config-inputs."
+        else
+            echo "Staged bottom roughness is out of date."
+            echo "The existing staged file will not be overwritten."
+            echo "Use a new BOTTOM_ROUGHNESS_VERSION in config.sh and rerun finalise.sh to generate a new version."
+            exit 2
+        fi
+    else
+        echo "No staged bottom roughness found; generating a new intermediate locally!"
+        python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+            --woa-temp-file="$INPUT_WOA_TEMP" \
+            --woa-salt-file="$INPUT_WOA_SALT" \
+            --synbath-file="$INPUT_SYNBATH" \
+            --output="$BOTTOM_ROUGHNESS_STAGING"
+    fi
     echo
     echo "Review and publish $BOTTOM_ROUGHNESS_STAGING through model-config-inputs."
-    echo "Then update it to its vk83 path: $BOTTOM_ROUGHNESS_INTERMEDIATE"
-    echo "and rerun finalise.sh to finish the topo generation."
+    echo "Then update BOTTOM_ROUGHNESS_INTERMEDIATE to its vk83 path: $BOTTOM_ROUGHNESS_INTERMEDIATE"
+    echo "and rerun finalise.sh to finish the topography generation."
     exit 1
 fi
 
