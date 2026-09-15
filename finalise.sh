@@ -6,19 +6,21 @@
 
 source ./config.sh
 
-echo "About to commit all changes to git repository and push to remote."
-read -p "Proceed? (y/n) " yesno
-case $yesno in
-   [Yy] ) ;;
-      * ) echo "Cancelled."; exit 0;;
-esac
-
+module purge
 module load nco
 module load git
 module use /g/data/xp65/public/modules
 module load conda/analysis3-25.11
 module use /g/data/vk83/modules
 module load model-tools/fre-nctools/2024.05-1
+
+# Check configuration before the existing commit/push prompt or any submissions.
+echo "About to commit all changes to git repository and push to remote."
+read -p "Proceed? (y/n) " yesno
+case $yesno in
+   [Yy] ) ;;
+      * ) echo "Cancelled."; exit 0;;
+esac
 
 set -x
 set -e
@@ -53,13 +55,14 @@ ROF_NY=$2
 #Make mesh / weights /wombatlite files
 INPUTS_JOB=$(qsub <<EOF
 #!/bin/bash
-#PBS -q normal
+#PBS -q normalsr
 #PBS -N inputs_generation
-#PBS -l walltime=8:00:00
-#PBS -l ncpus=48
-#PBS -l mem=190GB
+#PBS -l walltime=10:00:00
+#PBS -l ncpus=72
+#PBS -l mem=500GB
 #PBS -l wd
 #PBS -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/x77+gdata/av17
+#PBS -W umask=022
 
 module purge
 module use /g/data/xp65/public/modules
@@ -67,6 +70,60 @@ module load conda/analysis3-25.11
 
 set -x
 set -e
+
+# The intermediate bottom-roughness dataset is grid-independent and shared between OM3 resolutions.
+# 1st - Check the provenance of the published intermediate bottom roughness.
+# If it is missing or out of date, generate a new intermediate locally for review and publication through model-config-inputs.
+if python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+    --woa-temp-file="$INPUT_WOA_TEMP" \
+    --woa-salt-file="$INPUT_WOA_SALT" \
+    --synbath-file="$INPUT_SYNBATH" \
+    --existing-intermediate="$BOTTOM_ROUGHNESS_INTERMEDIATE"
+then
+    echo "Intermediate bottom roughness is current; reusing it."
+else
+    echo "Intermediate bottom roughness is missing or out of date; prepare to generate a new version locally"
+    if [[ -e "$BOTTOM_ROUGHNESS_STAGING" ]]; then
+        # Check if the previous generated staged file matches the inputs
+        if python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+            --woa-temp-file="$INPUT_WOA_TEMP" \
+            --woa-salt-file="$INPUT_WOA_SALT" \
+            --synbath-file="$INPUT_SYNBATH" \
+            --existing-intermediate="$BOTTOM_ROUGHNESS_STAGING"
+        then
+            echo "Staged bottom roughness is current; reusing it."
+            echo "Review and publish $BOTTOM_ROUGHNESS_STAGING through model-config-inputs."
+        else
+            echo "Staged bottom roughness is out of date."
+            echo "The existing staged file will not be overwritten."
+            echo "Use a new BOTTOM_ROUGHNESS_VERSION in config.sh and rerun finalise.sh to generate a new version."
+            exit 2
+        fi
+    else
+        echo "No staged bottom roughness found; generating a new intermediate locally!"
+        python3 ./om3-scripts/external_tidal_generation/prepare_bottom_roughness.py \
+            --woa-temp-file="$INPUT_WOA_TEMP" \
+            --woa-salt-file="$INPUT_WOA_SALT" \
+            --synbath-file="$INPUT_SYNBATH" \
+            --output="$BOTTOM_ROUGHNESS_STAGING"
+    fi
+    echo
+    echo "Review and publish $BOTTOM_ROUGHNESS_STAGING through model-config-inputs."
+    echo "Then update BOTTOM_ROUGHNESS_INTERMEDIATE to its vk83 path: $BOTTOM_ROUGHNESS_INTERMEDIATE"
+    echo "and rerun finalise.sh to finish the topography generation."
+    exit 1
+fi
+
+# Regrid after the intermediate is ready
+python3 ./om3-scripts/external_tidal_generation/generate_bottom_roughness_regrid.py \
+    --woa_intermediate_file="$BOTTOM_ROUGHNESS_INTERMEDIATE" \
+    --topog_file=topog.nc \
+    --hgrid_file=ocean_hgrid.nc \
+    --output_file=bottom_roughness.nc \
+    --method="$BOTTOM_ROUGHNESS_METHOD" \
+    --periodic_regrid \
+    --periodic_lon_laplace \
+    > "log_bottom_roughness_regrid_${RESOLUTION}.log" 2>&1
 
 # Create ESMF mesh from hgrid and topog.nc
 python3 ./om3-scripts/mesh_generation/generate_mesh.py --grid-type=mom --grid-filename=ocean_hgrid.nc --mesh-filename="$ESMF_MESH_FILE" --topog-filename=topog.nc --wrap-lons True
@@ -89,7 +146,7 @@ python3 ./om3-scripts/wombat_ic_generation/co2_iaf.py --co2-cmip-filename=/g/dat
 
 EOF
 )
-echo "Submitted tidal amplitude job: $INPUTS_JOB"
+echo "Submitted inputs generation job: $INPUTS_JOB"
 
 # Generate tidal files
 TIDAL_JOB=$(qsub <<'EOF'
@@ -101,6 +158,7 @@ TIDAL_JOB=$(qsub <<'EOF'
 #PBS -l mem=190GB
 #PBS -l wd
 #PBS -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/x77+gdata/av17
+#PBS -W umask=022
 
 module purge
 module use /g/data/xp65/public/modules
@@ -111,8 +169,6 @@ python3 ./om3-scripts/external_tidal_generation/generate_tide_amplitude.py --hgr
 EOF
 )
 echo "Submitted tidal amplitude job: $TIDAL_JOB"
-
-bash ./om3-scripts/external_tidal_generation/submit_bottom_roughness.sh -s ./ -r "$RESOLUTION" -p true -g ocean_hgrid.nc -t topog.nc -j ./om3-scripts/external_tidal_generation/pbs_bottom_roughness.pbs
 
 # Create mask table for the configured processor layout (defined in config.sh)
 # The mask table depends on this layout and must be regenerate if it changes
