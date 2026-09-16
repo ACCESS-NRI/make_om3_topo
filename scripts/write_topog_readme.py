@@ -5,16 +5,17 @@
 """
 Write a README.md for topog.nc and kmt.nc, following the same provenance
 convention used by the om3-scripts (see om3-scripts/scripts_common.py).
-Intended to be run as the last step of gen_topo.sh.
+Invoked by the `topog_readme` rule in the Snakefile.
 
 Usage:
-    python3 write_topog_readme.py <runcmd> <input_file> [<input_file> ...]
+    python3 scripts/write_topog_readme.py <runcmd> <input_file> [<input_file> ...]
 """
 
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent / "om3-scripts"))
+# This script lives in scripts/, so the om3-scripts submodule is one level up.
+sys.path.append(str(Path(__file__).resolve().parent.parent / "om3-scripts"))
 
 from scripts_common import get_provenance_metadata
 

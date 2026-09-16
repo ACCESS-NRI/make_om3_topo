@@ -1,0 +1,94 @@
+# Copyright 2026 ACCESS-NRI and contributors. See the top-level COPYRIGHT file for details.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Configuration for the ACCESS-OM3 topography workflow. Replaces config.sh.
+#
+# A resolution must be selected on the command line - there is deliberately no
+# default here, so that forgetting the flag fails immediately rather than
+# silently building the wrong resolution:
+#
+#     snakemake --config resolution=8km
+#
+# One working directory builds one resolution, as before. The intermediate
+# filenames under topography_intermediate_output/ carry no resolution tag (the
+# non-advective_*.ipynb notebooks hardcode them), so building two resolutions in
+# the same directory would collide. Use a separate directory per resolution.
+
+# External inputs shared by every resolution.
+gebco: /g/data/ik11/inputs/GEBCO_2024/GEBCO_2024.nc
+
+# Inputs for the bottom-roughness intermediate. This intermediate is
+# grid-independent and so is shared across resolutions; it is never published.
+woa_temp: /g/data/ik11/inputs/WOA23/woa23_decav_t00_04.nc
+woa_salt: /g/data/ik11/inputs/WOA23/woa23_decav_s00_04.nc
+synbath: /g/data/ik11/inputs/SYNBATH/SYNBATH.nc
+
+# Forcing inputs regridded onto the model grid.
+globcolour: /g/data/ik11/inputs/GlobColour/2026.05.07/cmems_obs-oc_glo_bgc-plankton_my_l4-multi-4km-climatology-filled_P1M.nc
+wombat_sfe: /g/data/ik11/inputs/WOMBAT/CESM-MIMI_1980-2015_CAM4-6MEAN_MonthlyDep_Hamiltonetal2020_clim.nc
+co2_cmip: /g/data/ik11/inputs/WOMBAT/co2_input4MIPs_GHGConcentrations_CMIP_CR-CMIP-1-0-0_gm_1750-2022.nc
+co2_noaa: /g/data/ik11/inputs/WOMBAT/co2_annmean_gl.gml.noaa.gov.txt
+
+tpxo_data: /g/data/ik11/inputs/TPXO10_atlas_v2
+
+# Root of the dated staging tree. `snakemake publish` copies products to
+#     <publish_root>/global.<resolution>/<release_date>/
+publish_root: /g/data/vk83/prerelease/staging/inputs/access-om3
+
+resolutions:
+
+  25km:
+    # Bump deliberately when cutting a release; it names the staging directory.
+    # Do NOT compute this from the current date - the output path would change
+    # every day and every run would rebuild from GEBCO.
+    release_date: "2026.09.16"
+
+    hgrid: /g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.25km/2026.06.11/ocean_hgrid.nc
+    vgrid: /g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc
+
+    cutoff_value: 6000
+    edit_topo: edits/edit_25km_topog.txt
+    edit_topo_bgrid: edits/edit_25km_topog_Bgrid.txt
+
+    use_bgrid_merge: false
+    b_mask: masks/B_mask_25km.nc
+
+    # Processor layout for mask-table generation. The mask table depends on the
+    # layout and must be regenerated if the target decomposition changes.
+    masktable_layout: [72, 48]
+
+  8km:
+    release_date: "2026.09.16"
+
+    hgrid: /g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.8km/2026.09.08/ocean_hgrid.nc
+    # NOTE: all three resolutions share this 25km vertical grid. It is not
+    # republished (see the `publish` rule), so nothing stamps a conflicting
+    # `resolution` attribute onto it.
+    vgrid: /g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc
+
+    cutoff_value: 1000
+    edit_topo: edits/edit_8km_topog.txt
+    edit_topo_bgrid: edits/edit_8km_topog_Bgrid.txt
+
+    use_bgrid_merge: false
+    b_mask: masks/B_mask_8km.nc
+
+    masktable_layout: [120, 100]
+
+  100km:
+    release_date: "2026.09.16"
+
+    hgrid: /g/data/vk83/prerelease/configurations/inputs/access-om3/mom/grids/mosaic/global.100km/2026.03.13/ocean_hgrid.nc
+    vgrid: /g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc
+
+    cutoff_value: 15400
+    edit_topo: edits/edit_100km_topog.txt
+    edit_topo_bgrid: edits/edit_100km_topog_Bgrid.txt
+
+    use_bgrid_merge: false
+    b_mask: masks/B_mask_100km.nc
+
+    # config.sh never set a 100km layout, so finalise.sh silently skipped
+    # mask-table generation here. Omitting the key keeps that behaviour, but
+    # now visibly rather than by accident.
+    masktable_layout: null

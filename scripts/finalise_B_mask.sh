@@ -5,27 +5,31 @@
 # Commit changes and push, then add metadata to note how changes were made
 #
 # Usage:
-#   ./finalise_B_mask.sh 25km
-#   ./finalise_B_mask.sh 8km
-#   ./finalise_B_mask.sh 100km
+#   ./scripts/finalise_B_mask.sh 25km
+#   ./scripts/finalise_B_mask.sh 8km
+#   ./scripts/finalise_B_mask.sh 100km
 
 set -e
 set -x
 
+# Paths below are relative to the repository root, so run from there regardless
+# of where this script was invoked.
+cd "$(dirname "$0")/.."
+
 case "${1:-25km}" in
   25km)
-    NOTEBOOK="make_B_mask_25km.ipynb"
-    NCFILE="B_mask_25km.nc"
+    NOTEBOOK="notebooks/make_B_mask_25km.ipynb"
+    NCFILE="masks/B_mask_25km.nc"
     LABEL="25km"
     ;;
   8km)
-    NOTEBOOK="make_B_mask_8km.ipynb"
-    NCFILE="B_mask_8km.nc"
+    NOTEBOOK="notebooks/make_B_mask_8km.ipynb"
+    NCFILE="masks/B_mask_8km.nc"
     LABEL="8km"
     ;;
   100km)
-    NOTEBOOK="make_B_mask_100km.ipynb"
-    NCFILE="B_mask_100km.nc"
+    NOTEBOOK="notebooks/make_B_mask_100km.ipynb"
+    NCFILE="masks/B_mask_100km.nc"
     LABEL="100km"
     ;;
   *)

@@ -1,0 +1,57 @@
+# Copyright 2026 ACCESS-NRI and contributors. See the top-level COPYRIGHT file for details.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Snakemake profile for NCI Gadi (PBS Pro).
+#
+#     snakemake -n --reason
+#     snakemake --config resolution=8km
+#
+# Requires:
+#     pip install snakemake-executor-plugin-cluster-generic
+#
+# Run the Snakemake head process in a small long-walltime job rather than on a
+# login node - NCI discourages long-running login-node processes. One low-ncpus
+# job is enough; it only submits and waits.
+#
+#     mkdir -p logs
+#
+# NEEDS CALIBRATION ON GADI. The per-rule mem/walltime values in the Snakefile
+# were derived from the monolithic allocations in gen_topo.sh (14 CPUs, 50GB,
+# 4h) and finalise.sh (48 CPUs, 190GB, 8h), which covered many steps at once.
+# Individual steps almost certainly need less. Tighten them once you have real
+# per-rule timings from the first end-to-end run.
+
+executor: cluster-generic
+
+cluster-generic-submit-cmd: >-
+  qsub
+  -P ${PROJECT}
+  -q {resources.queue}
+  -l ncpus={threads}
+  -l mem={resources.mem_mb}MB
+  -l walltime={resources.walltime}
+  -l wd
+  -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/x77+gdata/av17
+  -N smk-{rule}
+  -o logs/
+  -e logs/
+
+cluster-generic-status-cmd: profiles/default/pbs-status.sh
+cluster-generic-cancel-cmd: qdel
+
+default-resources:
+  - queue="normal"
+  - mem_mb=8000
+  - walltime="1:00:00"
+
+# Concurrent PBS jobs. The stage-C fan-out is 10 independent products, so this
+# is the ceiling that matters.
+jobs: 12
+
+# Gadi's /g/data is a shared filesystem; outputs can take a while to appear to
+# the head process after a job exits.
+latency-wait: 60
+
+printshellcmds: true
+rerun-incomplete: true
+keep-going: true

@@ -1,0 +1,40 @@
+# Copyright 2026 ACCESS-NRI and contributors. See the top-level COPYRIGHT file for details.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Generated outputs. Products are published to
+# /g/data/vk83/prerelease/staging/inputs/access-om3/global.<res>/<date>/
+# by `snakemake publish`; nothing generated is tracked here.
+#
+# B_mask_*.nc is deliberately NOT ignored - those are hand-made inputs, tracked
+# in this repo and stamped by finalise_B_mask.sh.
+
+# Locally staged copies of vk83 grid releases
+/ocean_hgrid.nc
+/ocean_vgrid.nc
+
+# Topography and masks
+/topog.nc
+/topog.README.md
+/kmt.nc
+/ocean_mask.nc
+/topography_intermediate_output/
+
+# Derived inputs
+/access-om3-*
+/chl_globcolour_monthly_clim.nc
+/SFe_Hamiltonetal2020_monthly_clim.nc
+/CO2_gm_*.nc
+/tideamp.nc
+/bottom_roughness.nc
+/bottom_roughness_intermediate.nc
+
+# Mask tables and FRE-NCtools leftovers
+/masktable/
+/mask_table.*
+/ocean_mosaic.nc
+
+# Snakemake and PBS
+/.snakemake/
+/logs/
+*.o[0-9]*
+*.e[0-9]*
