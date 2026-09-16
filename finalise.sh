@@ -59,7 +59,7 @@ INPUTS_JOB=$(qsub <<EOF
 #PBS -l ncpus=48
 #PBS -l mem=190GB
 #PBS -l wd
-#PBS -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/x77+gdata/av17
+#PBS -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/av17
 
 module purge
 module use /g/data/xp65/public/modules
@@ -100,13 +100,13 @@ TIDAL_JOB=$(qsub <<'EOF'
 #PBS -l ncpus=48
 #PBS -l mem=190GB
 #PBS -l wd
-#PBS -l storage=gdata/ik11+gdata/tm70+gdata/xp65+gdata/vk83+gdata/x77+gdata/av17
+#PBS -l storage=gdata/tm70+gdata/xp65+gdata/vk83+gdata/av17
 
 module purge
 module use /g/data/xp65/public/modules
 module load conda/analysis3-25.11
 
-python3 ./om3-scripts/external_tidal_generation/generate_tide_amplitude.py --hgrid-file=ocean_hgrid.nc --topog-file=topog.nc --method=conservative_normed --data-path=/g/data/ik11/inputs/TPXO10_atlas_v2 --output=tideamp.nc
+python3 ./om3-scripts/external_tidal_generation/generate_tide_amplitude.py --hgrid-file=ocean_hgrid.nc --topog-file=topog.nc --method=conservative_normed --data-path=/g/data/av17/access-nri/OM3/TPXO10_atlas_v2 --output=tideamp.nc
 
 EOF
 )
