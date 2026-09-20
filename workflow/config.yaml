@@ -1,0 +1,130 @@
+# Snakemake orchestration of the existing topography workflow.
+#
+# All generated data, logs, caches and environments live under `workdir`, which is
+# OUTSIDE this repository. Nothing here writes into the repo except the
+# `generate` topography provider - see the note on that below.
+
+repo_dir: /g/data/tm70/ek4684/make_OM3_025deg_topo_26_11_25
+workdir: /scratch/tm70/ek4684/om3-topo-workflow
+
+resolution: 8km
+
+# ---------------------------------------------------------------------------
+# Topography provider
+#
+#   supplied  - use an existing topography (default). ocean_mask.nc / kmt.nc are
+#               derived from it with the same commands gen_topo.sh uses.
+#   generate  - run the repo's gen_topo.sh, which produces topog.nc, ocean_mask.nc
+#               and kmt.nc together.
+#
+# LIMITATION (existing script, not worked around): gen_topo.sh is written to run
+# from the repository root - it does `source ./config.sh`, `./build.sh`,
+# `./bathymetry-tools/bin/topogtools ...` and writes ocean_hgrid.nc, topog.nc,
+# ocean_mask.nc, kmt.nc and topography_intermediate_output/ into the CURRENT
+# directory. It therefore cannot be pointed at an output directory without
+# modifying it. With `provider: generate` the rule runs it in the repo and then
+# copies the products into `workdir`; the intermediates it leaves behind remain
+# in the repo. Everything else in this workflow keeps generated data out of the
+# repository entirely.
+topog:
+  provider: supplied
+  supplied_topog: /g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.8km/2026.09.11/topog.nc
+
+# ---------------------------------------------------------------------------
+# Read-only inputs (values mirror config.sh's 8km block where applicable)
+# ---------------------------------------------------------------------------
+inputs:
+  hgrid: /g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.8km/2026.09.08/ocean_hgrid.nc
+  vgrid: /g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc
+  gebco: /g/data/ik11/inputs/GEBCO_2024/GEBCO_2024.nc
+  # Grid-independent (WOA23 T/S + SYNBATH only): reused whenever its own inputs
+  # are unchanged, so a topography change never triggers the ~52 min MPI stage.
+  bottom_roughness_intermediate: /g/data/tm70/ek4684/8km_grid_input_files/cgrid_topography_main/bottom_roughness_intermediate.nc
+  tpxo_dir: /g/data/ik11/inputs/TPXO10_atlas_v2
+  mankoff_aq: /g/data/av17/access-nri/OM3/Mankoff_2025_V11/AQ_iceberg_melt.nc
+  mankoff_gl: /g/data/av17/access-nri/OM3/Mankoff_2025_V11/GL_iceberg_melt.nc
+
+# ---------------------------------------------------------------------------
+# Parameters (defaults taken from config.sh's 8km block)
+# ---------------------------------------------------------------------------
+masktable:
+  layout_x: 120          # config.sh MASKTABLE_LAYOUT_X
+  layout_y: 100          # config.sh MASKTABLE_LAYOUT_Y
+  model: mom6
+  auto_adjust: true
+  periodx: 360.0
+
+bottom_roughness:
+  method: bilinear       # 100km uses conservative_normed; otherwise bilinear
+  periodic_regrid: true
+  periodic_lon_laplace: true
+
+tideamp:
+  method: conservative_normed
+
+# ---------------------------------------------------------------------------
+# Provenance verification (mandatory final step)
+#
+# The recorded path identifies WHICH input a record refers to; the hash is then
+# compared against a freshly computed hash of the input THIS workflow used -
+# never against whatever file currently sits at the recorded path, which may be
+# a superseded staging copy.
+# ---------------------------------------------------------------------------
+project_dir: /scratch/tm70/ek4684/om3-topo-workflow   # read by verify_provenance.py
+
+verification:
+  roles:
+    topog.nc: "@topog"
+    ocean_mask.nc: "@ocean_mask"
+    ocean_hgrid.nc: "@hgrid"
+    ocean_vgrid.nc: "@vgrid"
+    GEBCO_2024.nc: "@gebco"
+    bottom_roughness_intermediate.nc: "@bottom_roughness_intermediate"
+    AQ_iceberg_melt.nc: "@mankoff_aq"
+    GL_iceberg_melt.nc: "@mankoff_gl"
+
+  products:
+    kmt:
+      path: results/topog/kmt.nc
+      kind: netcdf
+      attributes: [input_file, ocean_mask_file]
+      algorithm: md5
+      require_topog: true
+    bottom_roughness:
+      path: results/tidal/bottom_roughness.nc
+      kind: netcdf
+      attributes: [inputFile]
+      algorithm: md5
+      require_topog: true
+    tideamp:
+      path: results/tidal/tideamp.nc
+      kind: netcdf
+      attributes: [inputFile]
+      algorithm: md5
+      require_topog: true
+    rofi:
+      path: results/rof/access-om3-8km-rofi-climatology.nc
+      kind: netcdf
+      attributes: [inputFile]
+      algorithm: md5
+      require_topog: true
+    mask_table:
+      path_from_manifest: results/masktable/manifest.json
+      kind: text
+      algorithm: md5
+      require_topog: true
+
+# ---------------------------------------------------------------------------
+# PBS (site policy: no substantial computation on login nodes)
+# ---------------------------------------------------------------------------
+pbs:
+  project: tm70
+  queue: normalsr
+  storage: gdata/vk83+gdata/xp65+gdata/ik11+gdata/av17+gdata/tm70+scratch/tm70
+  jobs:
+    gen_topo:          {ncpus: 14, mem: 190GB, walltime: "10:00:00"}
+    ocean_mask:        {ncpus: 4,  mem: 32GB,  walltime: "02:00:00"}
+    masktable:         {ncpus: 8,  mem: 32GB,  walltime: "00:30:00"}
+    bottom_roughness:  {ncpus: 8,  mem: 64GB,  walltime: "01:00:00"}
+    tideamp:           {ncpus: 48, mem: 190GB, walltime: "02:00:00"}
+    rofi:              {ncpus: 8,  mem: 64GB,  walltime: "01:00:00"}

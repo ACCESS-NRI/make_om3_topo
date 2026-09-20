@@ -70,6 +70,97 @@ The workflow [`gen_topo.sh`](https://github.com/ACCESS-NRI/make_om3_topo/blob/ma
    ./finalise.sh 100km
    ```
 
+## Running the topography-dependent steps with Snakemake (optional)
+
+`workflow/` adds a [Snakemake](https://snakemake.readthedocs.io) orchestration of the steps above, so that
+**changing the topography automatically regenerates everything derived from it**, and so that the input
+checksums already recorded in each output's provenance metadata are verified at the end.
+
+This does not replace `gen_topo.sh` or reimplement any science — it calls the same commands `finalise.sh`
+uses, with explicit paths. It never commits or pushes, and never invokes `finalise.sh`.
+
+### What it builds
+
+```
+topog.nc ──┬─> ocean_mask.nc ─> kmt.nc
+           ├─> mask_table.<n_mask>.<X>x<Y>
+           ├─> bottom_roughness.nc   (+ grid-independent intermediate)
+           ├─> tideamp.nc            (+ TPXO10)
+           └─> access-om3-<res>-rofi-climatology.nc   (+ Mankoff 2025)
+                              └──> MD5 provenance verification (mandatory)
+```
+
+Change `topog.nc` and only its dependents rebuild. The bottom-roughness *intermediate* is treated as an
+input rather than a product — it depends only on WOA23 T/S and SYNBATH, so a topography change does not
+trigger its ~52 minute MPI stage.
+
+### Configuration
+
+Everything lives in one file, `workflow/config.yaml`: input paths, the mask-table layout, PBS sizes, and
+which topography to use. Two providers are supported:
+
+- `provider: supplied` (default) — use an existing `topog.nc`; `ocean_mask.nc`/`kmt.nc` are derived from it
+  with the same commands `gen_topo.sh` uses.
+- `provider: generate` — run this repo's `gen_topo.sh`, which produces `topog.nc`, `ocean_mask.nc` and
+  `kmt.nc` together. All science parameters come from `config.sh` as usual.
+
+Generated data, logs, caches and Snakemake's own metadata are written to `workdir` (on `/scratch`), **not**
+into the repository.
+
+> **Limitation.** `gen_topo.sh` must run from the repository root (`source ./config.sh`, `./build.sh`,
+> `./bathymetry-tools/...`) and writes its outputs and `topography_intermediate_output/` into the current
+> directory. It therefore cannot be pointed at an output directory without modifying it. With
+> `provider: generate` the rule runs it in the repo and copies the products into `workdir`; the
+> intermediates it leaves behind stay in the repo. Every other rule keeps generated data out of the repo.
+
+### Usage
+
+```bash
+cd /path/to/make_om3_topo
+module use /g/data/xp65/public/modules && module load conda/analysis3-26.02
+
+W=/scratch/$PROJECT/$USER/om3-topo-workflow      # workdir, matches workflow/config.yaml
+SNAKE=/path/to/snakemake                          # e.g. a venv with snakemake installed
+
+# see what would run, without running it
+$SNAKE -s workflow/Snakefile --directory $W --cores 1 -n
+
+# run it (each step is submitted to PBS and waited on; -cores N runs independent steps concurrently)
+$SNAKE -s workflow/Snakefile --directory $W --cores 5
+
+# run again: generation is skipped, provenance is still verified
+$SNAKE -s workflow/Snakefile --directory $W --cores 1
+```
+
+`--directory $W` is what keeps Snakemake's `.snakemake/` metadata out of the repository.
+
+To use a different topography, or to regenerate it with `gen_topo.sh`:
+
+```bash
+$SNAKE -s workflow/Snakefile --directory $W --cores 1 -n \
+  --config topog="{'provider':'supplied','supplied_topog':'/path/to/topog.nc'}"
+
+$SNAKE -s workflow/Snakefile --directory $W --cores 1 \
+  --config topog="{'provider':'generate','supplied_topog':''}"
+```
+
+### Provenance verification
+
+The final step is mandatory and runs on **every** invocation, including when nothing needed regenerating —
+a report from an earlier run can never mask an input that has since changed.
+
+For each dependent file it reads the input filenames and MD5s the generation scripts already record
+(`input_file`/`ocean_mask_file` from the `gen_topo.sh` chain, `inputFile` from the om3-scripts tools, and the
+`#` comment header of the mask table) and compares each recorded hash against a freshly computed hash of the
+input **this workflow actually used** — in particular `topog.nc`. The recorded path is used only to identify
+*which* input a record refers to; hashing the file at that path would happily confirm a superseded staging
+copy.
+
+It fails clearly on a missing, unresolvable, ambiguous or mismatched record. A mismatch is never to be fixed
+by editing the recorded hash — regenerate the affected file from the correct inputs and verify again.
+
+Reports are written to `$W/results/verification/provenance-verification.{txt,json}`.
+
 ## Note on Dependencies  
 
 This workflow relies on the **xp65 conda environments** for running the scripts and generating the outputs. As long as you are [a member of the _xp65_ project](https://my.nci.org.au/mancini/project/xp65/members/active), this conda environment is loaded as part of the scripts. There's is data loaded from the `av17`, `ik11` and `xp65` projects.

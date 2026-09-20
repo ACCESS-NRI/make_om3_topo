@@ -1,0 +1,332 @@
+# Snakemake orchestration of this repository's existing topography workflow.
+#
+#   topog.nc ──┬─> ocean_mask.nc ─> kmt.nc
+#              ├─> mask_table.<n_mask>.<X>x<Y>
+#              ├─> bottom_roughness.nc   (+ grid-independent intermediate)
+#              ├─> tideamp.nc            (+ TPXO10)
+#              └─> rofi-climatology.nc   (+ Mankoff 2025)
+#                                   └──> MD5 provenance verification (mandatory)
+#
+# Scope: orchestration and provenance only. No scientific code is modified; the
+# generation commands are the ones finalise.sh already uses, with explicit paths.
+#
+#  * topog.nc is a NODE of this workflow, not a frozen checksum. Changing it - by
+#    supplying a different file or regenerating it - reschedules exactly its
+#    dependents.
+#
+#  * The bottom-roughness intermediate is an INPUT, not a product: it depends
+#    only on WOA23 T/S + SYNBATH, so a topography change does not rebuild it.
+#
+#  * Provenance verification runs on EVERY invocation, including when generation
+#    is skipped, via a run token that only the verification rule depends on.
+#
+#  * Everything generated goes to config["workdir"] on /scratch, outside the repo.
+#    (The one exception is the `generate` provider - see config.yaml.)
+#
+# This workflow never commits or pushes, and never invokes finalise.sh.
+
+import json
+import time
+from pathlib import Path
+
+configfile: workflow.basedir + "/config.yaml"
+
+REPO = Path(config["repo_dir"])
+WORK = Path(config["workdir"])
+SCRIPTS = Path(workflow.basedir) / "scripts"
+OM3 = REPO / "om3-scripts"
+TOPOGTOOLS = REPO / "bathymetry-tools" / "bin" / "topogtools"
+
+IN = config["inputs"]
+RES = config["resolution"]
+
+RESULTS = WORK / "results"
+LOGS = WORK / "logs"
+
+TOPOG        = RESULTS / "topog" / "topog.nc"
+OCEAN_MASK   = RESULTS / "topog" / "ocean_mask.nc"
+KMT          = RESULTS / "topog" / "kmt.nc"
+MT_MANIFEST  = RESULTS / "masktable" / "manifest.json"
+BOTTOM_ROUGH = RESULTS / "tidal" / "bottom_roughness.nc"
+TIDEAMP      = RESULTS / "tidal" / "tideamp.nc"
+ROFI         = RESULTS / "rof" / f"access-om3-{RES}-rofi-climatology.nc"
+
+VERIFY_JSON   = RESULTS / "verification" / "provenance-verification.json"
+VERIFY_TXT    = RESULTS / "verification" / "provenance-verification.txt"
+VERIFY_MARKER = RESULTS / "verification" / ".verified"
+
+# Rewritten on every invocation (including dry runs). Only the verification rule
+# depends on it, so the mandatory check re-runs every time - even when all
+# products are current - while the generation rules stay satisfied. A previously
+# written report can therefore never mask a subsequently stale input or output.
+RUN_TOKEN = WORK / "tmp" / "run_token"
+RUN_TOKEN.parent.mkdir(parents=True, exist_ok=True)
+RUN_TOKEN.write_text(f"{time.time_ns()}\n")
+
+
+def pbs(name: str) -> str:
+    j = config["pbs"]["jobs"][name]
+    return (
+        f'env WORKDIR={WORK} PBS_JOB_NAME={name} PBS_PROJECT={config["pbs"]["project"]} '
+        f'PBS_QUEUE={config["pbs"]["queue"]} PBS_NCPUS={j["ncpus"]} PBS_MEM={j["mem"]} '
+        f'PBS_WALLTIME={j["walltime"]} PBS_STORAGE={config["pbs"]["storage"]} '
+        f'{SCRIPTS / "submit_pbs.sh"}'
+    )
+
+
+ENV_PRELUDE = (
+    "module purge >/dev/null 2>&1 || true; "
+    "module use /g/data/xp65/public/modules; module load conda/analysis3-26.02; "
+    f"export PYTHONPYCACHEPREFIX={WORK}/tmp/pycache XDG_CACHE_HOME={WORK}/tmp/cache TMPDIR={WORK}/tmp"
+)
+
+
+rule all:
+    input:
+        VERIFY_MARKER
+
+
+# ---------------------------------------------------------------------------
+# Topography node
+# ---------------------------------------------------------------------------
+if config["topog"]["provider"] == "supplied":
+
+    rule supply_topog:
+        """Adopt a supplied topography as this workflow's topog node (a copy, so
+        downstream provenance refers to a file the workflow owns)."""
+        input:
+            source=config["topog"]["supplied_topog"],
+        output:
+            topog=TOPOG,
+        log:
+            LOGS / "supply_topog.log",
+        shell:
+            r"""
+            set -euo pipefail
+            mkdir -p $(dirname {output.topog})
+            cp -f {input.source} {output.topog}
+            md5sum {input.source} {output.topog} | tee {log}
+            """
+
+    rule ocean_mask_kmt:
+        """ocean_mask.nc + kmt.nc from the supplied topography, using the same
+        commands gen_topo.sh uses for this step."""
+        input:
+            topog=TOPOG,
+            script=SCRIPTS / "make_ocean_mask_kmt.sh",
+        output:
+            ocean_mask=OCEAN_MASK,
+            kmt=KMT,
+        params:
+            sub=pbs("ocean_mask"),
+            outdir=RESULTS / "topog",
+            topogtools=TOPOGTOOLS,
+        log:
+            LOGS / "ocean_mask_kmt.log",
+        shell:
+            r"""
+            set -euo pipefail
+            {params.sub} {input.script} {input.topog} {params.outdir} {params.topogtools} 2>&1 | tee {log}
+            test -s {output.kmt}
+            """
+
+else:
+
+    rule generate_topog:
+        """
+        Run the repository's gen_topo.sh, which produces topog.nc, ocean_mask.nc
+        and kmt.nc together, then copy those products into the workdir.
+
+        gen_topo.sh is used unmodified. It must run from the repository root
+        (`source ./config.sh`, `./build.sh`, `./bathymetry-tools/...`) and writes
+        its outputs and topography_intermediate_output/ there; see the LIMITATION
+        note in config.yaml. Resolution and all science parameters come from the
+        repo's own config.sh - this rule passes none of its own.
+        """
+        input:
+            hgrid=IN["hgrid"],
+            vgrid=IN["vgrid"],
+            gebco=IN["gebco"],
+        output:
+            topog=TOPOG,
+            ocean_mask=OCEAN_MASK,
+            kmt=KMT,
+        params:
+            sub=pbs("gen_topo"),
+            repo=REPO,
+            res=RES,
+            outdir=RESULTS / "topog",
+        log:
+            LOGS / "generate_topog.log",
+        shell:
+            r"""
+            set -euo pipefail
+            mkdir -p {params.outdir}
+            {params.sub} bash -c 'cd {params.repo} && ./gen_topo.sh {params.res}' 2>&1 | tee {log}
+            cp -f {params.repo}/topog.nc      {output.topog}
+            cp -f {params.repo}/ocean_mask.nc {output.ocean_mask}
+            cp -f {params.repo}/kmt.nc        {output.kmt}
+            """
+
+
+# ---------------------------------------------------------------------------
+# Topography-dependent products
+# ---------------------------------------------------------------------------
+rule masktable:
+    input:
+        topog=TOPOG,
+        hgrid=IN["hgrid"],
+        script=SCRIPTS / "run_masktable.sh",
+    output:
+        manifest=MT_MANIFEST,
+    params:
+        sub=pbs("masktable"),
+        lx=config["masktable"]["layout_x"],
+        ly=config["masktable"]["layout_y"],
+        model=config["masktable"]["model"],
+        periodx=config["masktable"]["periodx"],
+        auto=str(config["masktable"]["auto_adjust"]).lower(),
+        stage=WORK / "tmp" / "masktable_stage",
+        publish=RESULTS / "masktable",
+        om3=OM3,
+    log:
+        LOGS / "masktable.log",
+    shell:
+        r"""
+        set -euo pipefail
+        {params.sub} {input.script} {input.hgrid} {input.topog} {params.lx} {params.ly} \
+            {params.model} {params.periodx} {params.auto} \
+            {params.stage} {params.publish} {output.manifest} {params.om3} 2>&1 | tee {log}
+        test -s {output.manifest}
+        """
+
+
+rule bottom_roughness:
+    """Regrid the grid-independent intermediate onto this workflow's topography.
+    The intermediate is an input, so the ~52 min MPI stage is not re-run."""
+    input:
+        topog=TOPOG,
+        hgrid=IN["hgrid"],
+        intermediate=IN["bottom_roughness_intermediate"],
+    output:
+        nc=BOTTOM_ROUGH,
+    params:
+        sub=pbs("bottom_roughness"),
+        om3=OM3,
+        method=config["bottom_roughness"]["method"],
+        outdir=RESULTS / "tidal",
+        env=ENV_PRELUDE,
+    log:
+        LOGS / "bottom_roughness.log",
+    shell:
+        r"""
+        set -euo pipefail
+        mkdir -p {params.outdir}
+        {params.sub} bash -c '{params.env}; cd {params.outdir} && \
+            python3 {params.om3}/external_tidal_generation/generate_bottom_roughness_regrid.py \
+                --woa_intermediate_file {input.intermediate} \
+                --topog_file {input.topog} --hgrid_file {input.hgrid} \
+                --output_file {output.nc} --method {params.method} \
+                --periodic_regrid --periodic_lon_laplace' 2>&1 | tee {log}
+        test -s {output.nc}
+        """
+
+
+rule tideamp:
+    input:
+        topog=TOPOG,
+        hgrid=IN["hgrid"],
+    output:
+        nc=TIDEAMP,
+    params:
+        sub=pbs("tideamp"),
+        om3=OM3,
+        method=config["tideamp"]["method"],
+        tpxo=IN["tpxo_dir"],
+        outdir=RESULTS / "tidal",
+        env=ENV_PRELUDE,
+    log:
+        LOGS / "tideamp.log",
+    shell:
+        r"""
+        set -euo pipefail
+        mkdir -p {params.outdir}
+        {params.sub} bash -c '{params.env}; cd {params.outdir} && \
+            python3 {params.om3}/external_tidal_generation/generate_tide_amplitude.py \
+                --hgrid-file={input.hgrid} --topog-file={input.topog} \
+                --method={params.method} --data-path={params.tpxo} \
+                --output={output.nc}' 2>&1 | tee {log}
+        test -s {output.nc}
+        """
+
+
+rule rofi:
+    input:
+        topog=TOPOG,
+        hgrid=IN["hgrid"],
+        aq=IN["mankoff_aq"],
+        gl=IN["mankoff_gl"],
+    output:
+        nc=ROFI,
+    params:
+        sub=pbs("rofi"),
+        om3=OM3,
+        outdir=RESULTS / "rof",
+        env=ENV_PRELUDE,
+    log:
+        LOGS / "rofi.log",
+    shell:
+        r"""
+        set -euo pipefail
+        mkdir -p {params.outdir}
+        {params.sub} bash -c '{params.env}; cd {params.outdir} && \
+            python3 {params.om3}/rof_pattern_generation/generate_rofi_pattern.py \
+                --hgrid-filename={input.hgrid} --topog-file={input.topog} \
+                --output-filename={output.nc}' 2>&1 | tee {log}
+        test -s {output.nc}
+        """
+
+
+# ---------------------------------------------------------------------------
+# Mandatory final step: MD5 input-provenance verification
+# ---------------------------------------------------------------------------
+rule verify_provenance:
+    """
+    Compare the input MD5s the generators recorded in each product against
+    freshly computed hashes of the inputs THIS workflow used - especially
+    topog.nc. Fails on missing, unresolvable or mismatched records.
+
+    A mismatch is never resolved by rewriting a recorded hash: regenerate the
+    affected product from the correct inputs and verify again.
+    """
+    input:
+        kmt=KMT,
+        manifest=MT_MANIFEST,
+        bottom_roughness=BOTTOM_ROUGH,
+        tideamp=TIDEAMP,
+        rofi=ROFI,
+        topog=TOPOG,
+        ocean_mask=OCEAN_MASK,
+        verifier=SCRIPTS / "verify_provenance.py",
+        cfg=Path(workflow.basedir) / "config.yaml",
+        token=RUN_TOKEN,
+    output:
+        # Only this marker is tracked. The reports are deliberately NOT declared
+        # as outputs: Snakemake deletes a failed job's outputs, which would
+        # remove the verification report exactly when it is needed.
+        marker=VERIFY_MARKER,
+    params:
+        json_report=VERIFY_JSON,
+        text_report=VERIFY_TXT,
+        env=ENV_PRELUDE,
+    log:
+        LOGS / "verify_provenance.log",
+    shell:
+        r"""
+        set -euo pipefail
+        {params.env}
+        python3 {input.verifier} --config {input.cfg} \
+            --topog {input.topog} --ocean-mask {input.ocean_mask} \
+            --json-out {params.json_report} --text-out {params.text_report} 2>&1 | tee {log}
+        touch {output.marker}
+        """
