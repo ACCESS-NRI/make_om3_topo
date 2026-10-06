@@ -43,10 +43,10 @@ case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
         ;;
     8km)
         RESOLUTION='8km'
-        INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.8km/2026.09.08/ocean_hgrid.nc'
+        INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/share/grids/global.8km/2026.10.07/ocean_hgrid.nc'
         INPUT_VGRID='/g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc'
         B_MASK_FILE='B_mask_8km.nc'
-        CUTOFF_VALUE=1000
+        CUTOFF_VALUE=2000
         ESMF_MESH_FILE='access-om3-8km-ESMFmesh.nc'
         ESMF_NO_MASK_MESH_FILE='access-om3-8km-nomask-ESMFmesh.nc'
         ROF_WEIGHTS_FILE='access-om3-8km-rof-remap-weights.nc'
