@@ -63,7 +63,7 @@ case "$(printf '%s' "$RESOLUTION_INPUT" | tr '[:upper:]' '[:lower:]')" in
         INPUT_HGRID='/g/data/vk83/prerelease/configurations/inputs/access-om3/mom/grids/mosaic/global.100km/2026.03.13/ocean_hgrid.nc'
         INPUT_VGRID='/g/data/vk83/configurations/inputs/access-om3/mom/grids/vertical/global.25km/2025.03.12/ocean_vgrid.nc'
         B_MASK_FILE='B_mask_100km.nc'
-        CUTOFF_VALUE=15400
+        CUTOFF_VALUE=17000
         ESMF_MESH_FILE='access-om3-100km-ESMFmesh.nc'
         ESMF_NO_MASK_MESH_FILE='access-om3-100km-nomask-ESMFmesh.nc'
         ROF_WEIGHTS_FILE='access-om3-100km-rof-remap-weights.nc'
