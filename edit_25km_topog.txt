@@ -602,3 +602,6 @@ editTopo.py edits file version 1
   988  1091  282.0208740234375  0.0
   351  125  103.62161254882812  0.0
   1347  204  119.42333221435547  0.0
+# Remove single-cell embayment near Bering Strait
+# see https://github.com/ACCESS-NRI/access-om3-configs/issues/1833
+  412  917  10.432805061340332  0.0
