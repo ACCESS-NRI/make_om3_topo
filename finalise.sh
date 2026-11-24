@@ -16,7 +16,7 @@ esac
 module load nco
 module load git
 module use /g/data/xp65/public/modules
-module load conda/analysis3-25.11
+module load conda/analysis3-26.09
 module use /g/data/vk83/modules
 module load model-tools/fre-nctools/2024.05-1
 
@@ -63,7 +63,7 @@ INPUTS_JOB=$(qsub <<EOF
 
 module purge
 module use /g/data/xp65/public/modules
-module load conda/analysis3-25.11
+module load conda/analysis3-26.09
 
 set -x
 set -e
@@ -104,7 +104,7 @@ TIDAL_JOB=$(qsub <<'EOF'
 
 module purge
 module use /g/data/xp65/public/modules
-module load conda/analysis3-25.11
+module load conda/analysis3-26.09
 
 python3 ./om3-scripts/external_tidal_generation/generate_tide_amplitude.py --hgrid-file=ocean_hgrid.nc --topog-file=topog.nc --method=conservative_normed --data-path=/g/data/av17/access-nri/OM3/TPXO10_atlas_v2 --output=tideamp.nc
 
