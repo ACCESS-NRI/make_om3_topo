@@ -172,3 +172,22 @@ editTopo.py edits file version 1
 # https://github.com/ACCESS-NRI/access-om3-configs/issues/1658#issuecomment-5883897281
 #    i     j  old  new
   2414  3155  0.0  90.38
+#
+# Fill small single/few-cell embayments receiving large runoff in Baydaratskaya Bay (head and NE corner) and the
+# Gulf of Ob (southern tip and head of eastern arm), 14 cells.
+# https://github.com/ACCESS-NRI/access-om3-configs/issues/1858
+#    i     j  old  new
+  4149  3153  1.2  0.0
+  4148  3154  2.4  0.0
+  4149  3154  1.5  0.0
+  4148  3155  2.2  0.0
+  4149  3155  1.9  0.0
+  4144  3180  2.5  0.0
+  4142  3181  2.9  0.0
+  4143  3181  3.6  0.0
+  4144  3181  3.8  0.0
+  4190  3229  3.3  0.0
+  4190  3230  6.0  0.0
+  4198  3310  3.1  0.0
+  4197  3311  2.4  0.0
+  4198  3311  2.0  0.0
