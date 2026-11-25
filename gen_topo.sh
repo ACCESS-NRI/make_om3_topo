@@ -16,7 +16,7 @@ source ./config.sh
 
 module purge
 module use /g/data/xp65/public/modules
-module load conda/analysis3-25.11
+module load conda/analysis3-26.09
 module load nco
 
 set -x # print commands to e file
